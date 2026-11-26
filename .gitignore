@@ -1,0 +1,18 @@
+# Віртуальне середовище — кожен створює своє (pip install -r requirements.txt)
+.venv/
+
+# Службові файли Python і macOS
+__pycache__/
+*.pyc
+.DS_Store
+
+# Дані зйомки, звіти і логи — створюються під час роботи програми
+data/raw/*
+data/annotated/*
+data/masks/*
+data/import/*
+data/*.db
+reports/*
+logs/*
+# ...але порожні папки зберігаємо (файли .gitkeep)
+!**/.gitkeep

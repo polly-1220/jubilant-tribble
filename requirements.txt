@@ -1,0 +1,26 @@
+# Бібліотеки для ReBuildDrone.
+# Встановлення: pip install -r requirements.txt
+
+# Інтерфейс у браузері
+streamlit>=1.36
+
+# Зв'язок з дроном по USB (протокол MSP)
+pyserial>=3.5
+
+# Комп'ютерний зір: вебкамера, різкість, ArUco-мітки
+# (саме "contrib"-версія, бо в ній є модуль aruco)
+opencv-contrib-python>=4.8
+
+# Числа, таблиці, графіки
+numpy>=1.26
+pandas>=2.1
+matplotlib>=3.8   # також містить шрифт DejaVuSans для PDF українською
+
+# Запуск AI-моделі у форматі ONNX (етап 4)
+onnxruntime>=1.17
+
+# PDF-звіт (етап 5)
+reportlab>=4.0
+
+# Робота з картинками
+pillow>=10.0
