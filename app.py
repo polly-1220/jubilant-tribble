@@ -5,7 +5,7 @@ ReBuildDrone — головний файл застосунку.
 import streamlit as st
 
 from core import config, db
-from ui import ai_tab, camera_tab, drone_tab, report_tab
+from ui import ai_tab, camera_tab, drone_tab, report_tab, twin_tab
 
 # Налаштування сторінки (має бути першою командою Streamlit)
 st.set_page_config(page_title="ReBuildDrone", page_icon="🛸", layout="wide")
@@ -82,5 +82,4 @@ elif section == "🤖 AI-аналіз":
 elif section == "📄 Звіт":
     report_tab.render()
 else:
-    st.subheader("3D-двійник макета")
-    st.info("Етап 6: 3D-модель із кольоровими секторами.")
+    twin_tab.render()

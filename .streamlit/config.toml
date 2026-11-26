@@ -6,3 +6,5 @@ gatherUsageStats = false
 [server]
 # Порт, на якому відкривається застосунок
 port = 8501
+# Віддавати файли з папки static/ (там 3D-модель maket.glb) за адресою /app/static/
+enableStaticServing = true

@@ -18,6 +18,7 @@ from datetime import datetime
 from xml.sax.saxutils import escape
 
 import cv2
+import numpy as np
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -166,7 +167,7 @@ def build_report(survey_id=None):
     story.append(Paragraph("Модель макета", st["h2"]))
     if config.SNAPSHOT_3D.exists():
         img = cv2.cvtColor(cv2.imread(str(config.SNAPSHOT_3D)), cv2.COLOR_BGR2RGB)
-        story.append(_img_flowable(img, 15 * cm, 10 * cm))
+        story.append(_img_flowable(_crop_to_content(img), 15 * cm, 10 * cm))
         story.append(Paragraph("Знімок 3D-двійника макета. Колір сектора — за кількістю "
                                "підтверджених тріщин.", st["small"]))
     else:
@@ -259,6 +260,18 @@ def build_report(survey_id=None):
     timing_log.log("PDF-звіт", ms, path.name,
                    f"знімків: {len(items)}; знахідок: {len(all_f)}")
     return path, ms
+
+
+def _crop_to_content(rgb, pad=30):
+    """Обрізає однотонне тло навколо моделі на 3D-знімку."""
+    bg = rgb[0, 0].astype(int)
+    diff = np.abs(rgb.astype(int) - bg).sum(axis=2) > 30
+    ys, xs = np.nonzero(diff)
+    if len(xs) == 0:
+        return rgb
+    h, w = rgb.shape[:2]
+    return rgb[max(ys.min() - pad, 0):min(ys.max() + pad, h),
+               max(xs.min() - pad, 0):min(xs.max() + pad, w)]
 
 
 def _sector_scheme(sectors, st):

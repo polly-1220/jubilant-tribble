@@ -1,0 +1,362 @@
+<!doctype html>
+<!--
+  3D-двійник макета для ReBuildDrone.
+  Працює повністю офлайн: three.js лежить поруч у папці three/ (не з інтернету).
+
+  Що вміє:
+   - показує модель models/maket.glb або тестовий «будинок» з 9 секторами на фасаді;
+   - фарбує сектори: зелений 0, жовтий 1–2, червоний 3+ ПІДТВЕРДЖЕНИХ тріщин;
+   - режим «Перегляд»: клік по сектору -> Python показує список знахідок;
+   - режим «Розмітка»: клік по моделі -> Python записує місце сектора в sectors.json;
+   - кнопка «Знімок для звіту» -> картинка потрапляє в PDF.
+
+  Зв'язок зі Streamlit — через повідомлення postMessage (протокол компонентів Streamlit).
+-->
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", sans-serif; background: transparent; }
+  #wrap { position: relative; width: 100%; height: 540px; border-radius: 10px; overflow: hidden; background: #eef1f5; }
+  canvas { display: block; }
+  #toolbar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid #c9ced6; background: #fff; cursor: pointer; }
+  button:hover { background: #f3f5f8; }
+  #legend { position: absolute; left: 10px; bottom: 10px; background: rgba(255,255,255,.92); padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.6; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+  #mode { position: absolute; left: 10px; top: 52px; background: rgba(255,255,255,.92); padding: 6px 10px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 40px); }
+  #tip { position: absolute; pointer-events: none; background: rgba(20,20,20,.85); color: #fff; font-size: 12px; padding: 6px 8px; border-radius: 6px; display: none; white-space: nowrap; }
+  #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 20px; color: #7a1f1f; background: #fdf0ef; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "./three/three.module.js", "three/addons/": "./three/addons/" } }
+</script>
+</head>
+<body>
+<div id="wrap">
+  <div id="mode"></div>
+  <div id="toolbar">
+    <button id="btnReset" title="Повернути камеру">🎯 Вигляд</button>
+    <button id="btnShot" title="Зберегти картинку для PDF-звіту">📸 Знімок для звіту</button>
+  </div>
+  <div id="legend">
+    <div><span class="sw" style="background:#2e9e4f"></span>0 підтверджених тріщин</div>
+    <div><span class="sw" style="background:#f2c12e"></span>1–2</div>
+    <div><span class="sw" style="background:#d63b3b"></span>3 і більше</div>
+  </div>
+  <div id="tip"></div>
+  <div id="err"></div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const HEIGHT = 540;
+const SECTORS = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3'];
+
+// ---------- Зв'язок зі Streamlit ----------
+function send(type, data) {
+  window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type }, data), '*');
+}
+function setValue(value) {
+  send('streamlit:setComponentValue', { value: Object.assign({ id: Date.now() + Math.random() }, value), dataType: 'json' });
+}
+
+// ---------- Сцена ----------
+const wrap = document.getElementById('wrap');
+const tip = document.getElementById('tip');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+wrap.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#eef1f5');
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(5, 8, 6);
+scene.add(sun);
+const grid = new THREE.GridHelper(20, 40, 0xc3c8d0, 0xd8dce2);
+scene.add(grid);
+
+const modelRoot = new THREE.Group();   // сама модель (або тестовий будинок)
+const markerRoot = new THREE.Group();  // кольорові диски секторів і підписи
+scene.add(modelRoot, markerRoot);
+
+let args = {};
+let modelKey = null;      // яку модель зараз завантажено
+let modelSize = 4;        // розмір моделі (для розміру дисків і підписів)
+let tiles = {};           // сектор -> плитка фасаду (лише в тестовому будинку)
+let homeView = null;
+
+function resize() {
+  const w = wrap.clientWidth || window.innerWidth;
+  renderer.setSize(w, HEIGHT);
+  camera.aspect = w / HEIGHT;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+// ---------- Тестовий будинок: фасад розбито на 3×3 сектори ----------
+function buildTestHouse() {
+  const W = 3, H = 3, D = 1.6;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D),
+    new THREE.MeshStandardMaterial({ color: 0xd9d4cc, roughness: 0.9 }));
+  body.position.y = H / 2;
+  modelRoot.add(body);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1.1, 4),
+    new THREE.MeshStandardMaterial({ color: 0x8c6b5a, roughness: 0.8 }));
+  roof.rotation.y = Math.PI / 4;
+  roof.position.y = H + 0.55;
+  roof.scale.set(1, 1, 0.75);
+  modelRoot.add(roof);
+  // плитки секторів на передній стіні: A — верхній ряд, C — нижній
+  const tw = W / 3, th = H / 3, gap = 0.04;
+  SECTORS.forEach((name, i) => {
+    const row = Math.floor(i / 3), col = i % 3;
+    const tile = new THREE.Mesh(new THREE.PlaneGeometry(tw - gap, th - gap),
+      new THREE.MeshStandardMaterial({ color: 0x2e9e4f, roughness: 0.7 }));
+    tile.position.set(-W / 2 + tw * (col + 0.5), H - th * (row + 0.5), D / 2 + 0.005);
+    tile.name = name;
+    tile.userData.sector = name;
+    modelRoot.add(tile);
+    tiles[name] = tile;
+  });
+  modelSize = 4;
+  fitCamera(new THREE.Box3().setFromObject(modelRoot), new THREE.Vector3(0.35, 0.25, 1));
+}
+
+// ---------- Модель maket.glb ----------
+function loadGlb(url) {
+  return new Promise((resolve, reject) => {
+    new GLTFLoader().load(url, (gltf) => {
+      const obj = gltf.scene;
+      // Ставимо модель на «підлогу» і робимо її розміром ~4 одиниці
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const scale = 4 / Math.max(size.x, size.y, size.z);
+      obj.scale.setScalar(scale);
+      const box2 = new THREE.Box3().setFromObject(obj);
+      const c = box2.getCenter(new THREE.Vector3());
+      obj.position.sub(new THREE.Vector3(c.x, box2.min.y, c.z));
+      modelRoot.add(obj);
+      modelSize = 4;
+      fitCamera(new THREE.Box3().setFromObject(modelRoot), new THREE.Vector3(0.45, 0.4, 1), 1.35);
+      resolve();
+    }, undefined, reject);
+  });
+}
+
+function fitCamera(box, dir, k = 0.95) {
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  const pos = center.clone().add(dir.normalize().multiplyScalar(size * k));
+  homeView = { pos, target: center };
+  camera.position.copy(pos);
+  controls.target.copy(center);
+  controls.update();
+}
+
+function clearGroup(g) {
+  while (g.children.length) {
+    const o = g.children.pop();
+    o.traverse?.((x) => { x.geometry?.dispose(); if (x.material) [].concat(x.material).forEach((m) => { m.map?.dispose(); m.dispose(); }); });
+  }
+}
+
+// ---------- Підпис-спрайт ----------
+function makeLabel(text, color) {
+  const cnv = document.createElement('canvas');
+  cnv.width = 256; cnv.height = 96;
+  const ctx = cnv.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath(); ctx.roundRect(4, 4, 248, 88, 18); ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.stroke();
+  ctx.fillStyle = '#111'; ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 50);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(cnv), depthTest: false, transparent: true }));
+  const s = modelSize * 0.09;
+  sprite.scale.set(s * 2.67, s, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
+// ---------- Кольори і мітки секторів ----------
+function statsFor(name) {
+  return (args.stats || {})[name] || { confirmed: 0, pending: 0, rejected: 0, images: 0, color: '#2e9e4f' };
+}
+
+function updateSectors() {
+  clearGroup(markerRoot);
+  const selected = args.selected;
+  if (args.is_test_model) {
+    for (const name of SECTORS) {
+      const st = statsFor(name);
+      const tile = tiles[name];
+      tile.material.color.set(st.color);
+      tile.material.emissive = new THREE.Color(name === selected ? 0x333333 : 0x000000);
+      const label = makeLabel(`${name} · ${st.confirmed}`, st.color);
+      label.position.copy(tile.position).add(new THREE.Vector3(0, 0, 0.05));
+      label.scale.multiplyScalar(0.9);
+      label.userData.sector = name;
+      markerRoot.add(label);
+      if (name === selected) {
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(tile.geometry),
+          new THREE.LineBasicMaterial({ color: 0x1565c0 }));
+        edges.position.copy(tile.position).add(new THREE.Vector3(0, 0, 0.01));
+        markerRoot.add(edges);
+      }
+    }
+    return;
+  }
+  // Справжня модель: на кожне розмічене місце — кольоровий диск і підпис
+  const sectors = args.sectors || {};
+  for (const [name, s] of Object.entries(sectors)) {
+    if (!s.point) continue;
+    const st = statsFor(name);
+    const r = (s.radius || 0.08) * modelSize;
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(r, 48),
+      new THREE.MeshBasicMaterial({ color: st.color, transparent: true, opacity: 0.6,
+        side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    const p = new THREE.Vector3(...s.point);
+    const n = new THREE.Vector3(...(s.normal || [0, 0, 1])).normalize();
+    disc.position.copy(p).addScaledVector(n, modelSize * 0.002);
+    disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+    disc.userData.sector = name;
+    markerRoot.add(disc);
+    if (name === selected) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.02, r * 1.15, 48),
+        new THREE.MeshBasicMaterial({ color: 0x1565c0, side: THREE.DoubleSide, depthWrite: false }));
+      ring.position.copy(disc.position); ring.quaternion.copy(disc.quaternion);
+      markerRoot.add(ring);
+    }
+    const label = makeLabel(`${name} · ${st.confirmed}`, st.color);
+    label.position.copy(p).addScaledVector(n, r * 0.9);
+    label.userData.sector = name;
+    markerRoot.add(label);
+  }
+}
+
+function updateModeText() {
+  const el = document.getElementById('mode');
+  if (args.mode === 'mark') {
+    el.innerHTML = `✏️ <b>Розмітка:</b> клікни на моделі, де сектор <b>${args.mark_sector}</b>`;
+  } else {
+    el.innerHTML = '👆 Клікни на сектор, щоб побачити знахідки. Мишка: обертати, коліщатко: масштаб.';
+  }
+}
+
+// ---------- Отримали нові дані від Python ----------
+async function onRender(newArgs) {
+  args = newArgs || {};
+  resize();
+  const key = args.is_test_model ? 'test' : args.model_url;
+  if (key !== modelKey) {
+    modelKey = key;
+    clearGroup(modelRoot);
+    tiles = {};
+    try {
+      if (args.is_test_model) buildTestHouse();
+      else await loadGlb(args.model_url);
+    } catch (e) {
+      const err = document.getElementById('err');
+      err.style.display = 'flex';
+      err.textContent = 'Не вдалося відкрити models/maket.glb: ' + (e.message || e) +
+        '. Перевір файл (формат GLB, без Draco-стиснення).';
+    }
+  }
+  updateSectors();
+  updateModeText();
+}
+
+window.addEventListener('message', (ev) => {
+  if (ev.data && ev.data.type === 'streamlit:render') onRender(ev.data.args);
+});
+
+// ---------- Мишка: клік і підказка ----------
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let downAt = null;
+
+function pick(ev, objects) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  return raycaster.intersectObjects(objects, true);
+}
+
+function sectorAt(ev) {
+  const hit = pick(ev, [markerRoot, modelRoot]).find((h) => h.object.userData.sector);
+  return hit ? hit.object.userData.sector : null;
+}
+
+renderer.domElement.addEventListener('pointerdown', (ev) => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', (ev) => {
+  if (!downAt) return;
+  const moved = Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]);
+  downAt = null;
+  if (moved > 5) return;   // це було обертання камери, а не клік
+  if (args.mode === 'mark' && !args.is_test_model) {
+    const hit = pick(ev, [modelRoot])[0];
+    if (!hit) return;
+    const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 0, 1);
+    if (n.dot(raycaster.ray.direction) > 0) n.negate();   // нормаль — до камери
+    setValue({ type: 'mark', sector: args.mark_sector,
+      point: hit.point.toArray().map((v) => +v.toFixed(4)),
+      normal: n.toArray().map((v) => +v.toFixed(4)),
+      mesh: hit.object.name || null });
+  } else {
+    const name = sectorAt(ev);
+    if (name) setValue({ type: 'select', sector: name });
+  }
+});
+
+renderer.domElement.addEventListener('pointermove', (ev) => {
+  const name = sectorAt(ev);
+  if (!name) { tip.style.display = 'none'; return; }
+  const st = statsFor(name);
+  tip.innerHTML = `<b>${name}</b> · знімків ${st.images}<br>🔴 підтверджено ${st.confirmed} · 🟡 не перевірено ${st.pending} · ⚪ відхилено ${st.rejected}`;
+  const rect = wrap.getBoundingClientRect();
+  tip.style.left = Math.min(ev.clientX - rect.left + 14, rect.width - 260) + 'px';
+  tip.style.top = (ev.clientY - rect.top + 14) + 'px';
+  tip.style.display = 'block';
+});
+renderer.domElement.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+
+// ---------- Кнопки ----------
+document.getElementById('btnReset').onclick = () => {
+  if (!homeView) return;
+  camera.position.copy(homeView.pos);
+  controls.target.copy(homeView.target);
+  controls.update();
+};
+document.getElementById('btnShot').onclick = () => {
+  grid.visible = false;
+  renderer.render(scene, camera);
+  const png = renderer.domElement.toDataURL('image/png');
+  grid.visible = true;
+  setValue({ type: 'snapshot', png });
+};
+
+// ---------- Малювання ----------
+function loop() {
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+resize();
+loop();
+
+// Повідомляємо Streamlit, що компонент готовий, і задаємо висоту
+send('streamlit:componentReady', { apiVersion: 1 });
+send('streamlit:setFrameHeight', { height: HEIGHT + 4 });
+</script>
+</body>
+</html>
