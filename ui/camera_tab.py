@@ -45,7 +45,9 @@ def render():
         quality.QualitySettings.brightness_min = bmin
         quality.QualitySettings.brightness_max = bmax
 
-    live_camera()
+    # Живий перегляд оновлюється 4 рази на секунду — лише коли камера увімкнена
+    st.session_state.setdefault("seen_shots", cam.shots_count)
+    st.fragment(live_camera, run_every=0.25 if cam.running else None)()
 
     # ---------- Імпорт фото ----------
     with st.expander("📂 Імпорт фото (з телефона)"):
@@ -70,12 +72,19 @@ def render():
     gallery()
 
 
-# Живий перегляд камери (оновлюється 4 рази на секунду)
-@st.fragment(run_every=0.25)
 def live_camera():
     cam = get_camera()
+    # З'явився новий знімок (наприклад, автозйомка) — оновлюємо всю сторінку, щоб він
+    # потрапив у галерею. Те саме, якщо камера раптом вимкнулась (помилка).
+    if cam.shots_count != st.session_state["seen_shots"]:
+        st.session_state["seen_shots"] = cam.shots_count
+        st.rerun(scope="app")
     if cam.error:
         st.error(cam.error)
+        if st.session_state.get("cam_was_running"):
+            st.session_state["cam_was_running"] = False
+            st.rerun(scope="app")
+    st.session_state["cam_was_running"] = cam.running
     frame = cam.get_frame()
     if frame is None:
         if cam.running:
@@ -114,8 +123,8 @@ def live_camera():
             st.caption("Останній знімок: " + cam.last_message)
 
 
-# Галерея знімків (оновлюється кожні 3 секунди, щоб з'являлися автознімки)
-@st.fragment(run_every=3)
+# Галерея знімків (нові знімки з'являються, коли живий перегляд оновлює сторінку)
+@st.fragment
 def gallery():
     items = captures.list_captures()
     st.subheader(f"Знімки ({len(items)})")

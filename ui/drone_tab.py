@@ -33,11 +33,11 @@ def render():
     )
     reader.set_threshold(threshold)
 
-    live_panel(threshold)
+    # Жива панель оновлюється сама 4 рази на секунду (лише коли дрон увімкнений),
+    # не перезапускаючи всю сторінку
+    st.fragment(live_panel, run_every=0.25 if reader.running else None)(threshold)
 
 
-# Ця частина оновлюється сама 4 рази на секунду, не перезапускаючи всю сторінку
-@st.fragment(run_every=0.25)
 def live_panel(threshold):
     snap = get_reader().snapshot()
 

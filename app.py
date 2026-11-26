@@ -5,7 +5,7 @@ ReBuildDrone — головний файл застосунку.
 import streamlit as st
 
 from core import config
-from ui import camera_tab, drone_tab
+from ui import ai_tab, camera_tab, drone_tab
 
 # Налаштування сторінки (має бути першою командою Streamlit)
 st.set_page_config(page_title="ReBuildDrone", page_icon="🛸", layout="wide")
@@ -44,25 +44,23 @@ with st.sidebar:
     st.write("3D-модель:", "✅ знайдено" if config.MAKET_MODEL_PATH.exists()
              else "⚠️ немає (буде тестовий куб)")
 
-# ---------- Вкладки: по одній на кожен етап ----------
-tab_drone, tab_camera, tab_ai, tab_report, tab_3d = st.tabs(
-    ["🛸 Дрон", "📷 Зйомка", "🤖 AI-аналіз", "📄 Звіт", "🧊 3D-двійник"]
-)
+# ---------- Розділи: показуємо лише вибраний ----------
+# (Звичайні st.tabs малюють усі вкладки одразу, і живі панелі дрона й камери
+#  оновлювалися б навіть тоді, коли ти перевіряєш знахідки, — через це губилися б кліки.)
+SECTIONS = ["🛸 Дрон", "📷 Зйомка", "🤖 AI-аналіз", "📄 Звіт", "🧊 3D-двійник"]
+section = st.radio("Розділ", SECTIONS, horizontal=True, key="section",
+                   label_visibility="collapsed")
+st.divider()
 
-with tab_drone:
+if section == "🛸 Дрон":
     drone_tab.render()
-
-with tab_camera:
+elif section == "📷 Зйомка":
     camera_tab.render()
-
-with tab_ai:
-    st.subheader("AI-аналіз і перевірка людиною")
-    st.info("Етап 4: пошук тріщин і кнопки «Підтвердити» / «Відхилити».")
-
-with tab_report:
+elif section == "🤖 AI-аналіз":
+    ai_tab.render()
+elif section == "📄 Звіт":
     st.subheader("PDF-звіт")
     st.info("Етап 5: збереження в базу і формування звіту.")
-
-with tab_3d:
+else:
     st.subheader("3D-двійник макета")
     st.info("Етап 6: 3D-модель із кольоровими секторами.")

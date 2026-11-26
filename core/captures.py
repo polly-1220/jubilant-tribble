@@ -8,6 +8,7 @@
 """
 import json
 import shutil
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import cv2
 from core import config, quality, sector
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
+_lock = threading.RLock()   # один запис опису за раз
 
 
 def _new_id():
@@ -84,18 +86,34 @@ def list_captures():
     return metas
 
 
+def update(cap_id, change):
+    """
+    Безпечно змінює опис знімка: читає, викликає change(meta), записує.
+    Замок не дає двом потокам (камера і інтерфейс) писати одночасно.
+    """
+    with _lock:
+        meta = load(cap_id)
+        change(meta)
+        _write_meta(meta)
+        return meta
+
+
 def set_sector_manual(cap_id, name):
     """Вибір сектора вручну (якщо мітку не знайдено або визначено неправильно)."""
-    meta = load(cap_id)
-    if name is None:
-        meta["sector"].update({"name": None, "method": None})
-    else:
-        meta["sector"].update({"name": name, "method": "вручну"})
-    _write_meta(meta)
+    def change(meta):
+        if name is None:
+            meta["sector"].update({"name": None, "method": None})
+        else:
+            meta["sector"].update({"name": name, "method": "вручну"})
+    update(cap_id, change)
 
 
 def delete_capture(cap_id):
-    for p in [config.RAW_DIR / f"{cap_id}.jpg", _meta_path(cap_id)]:
+    """Видаляє знімок разом з масками і розміченою копією."""
+    files = [config.RAW_DIR / f"{cap_id}.jpg", _meta_path(cap_id),
+             config.ANNOTATED_DIR / f"{cap_id}.jpg"]
+    files += list(config.MASKS_DIR.glob(f"{cap_id}_*.png"))
+    for p in files:
         p.unlink(missing_ok=True)
 
 
