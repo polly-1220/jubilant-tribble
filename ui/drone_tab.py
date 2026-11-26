@@ -6,22 +6,23 @@ import streamlit as st
 
 from core import config
 from core.drone_reader import HISTORY_SEC, get_reader
+from ui import style
 
 
 def render():
     reader = get_reader()
 
     st.subheader("Дрон: нахил і стабільність")
-    st.caption("⚠️ Перед підключенням натисни «Disconnect» у Betaflight Configurator у Chrome "
+    st.caption("Перед підключенням натисни «Disconnect» у Betaflight Configurator у Chrome "
                "(або закрий його вкладку), інакше порт буде зайнятий.")
 
     # ---------- Кнопки керування ----------
-    col1, col2, col3 = st.columns([1, 1, 2])
+    col1, col2, col3 = st.columns([1, 1, 2], vertical_alignment="center")
     demo = col3.toggle("Демо-режим (без дрона)", value=False,
                        help="Несправжні дані, щоб перевірити інтерфейс без дрона.")
-    if col1.button("🔌 Підключити", width="stretch"):
+    if col1.button("Підключити", icon=":material/link:", type="primary", width="stretch"):
         reader.start(demo=demo)
-    if col2.button("⏹ Від'єднати", width="stretch"):
+    if col2.button("Від'єднати", icon=":material/link_off:", width="stretch"):
         reader.stop()
 
     # ---------- Поріг стабільності ----------
@@ -43,16 +44,16 @@ def live_panel(threshold):
 
     # ---------- Стан зв'язку ----------
     if not snap["running"]:
-        st.info("Дрон не підключено. Натисни «🔌 Підключити».")
+        style.empty(f"<b>Дрон не підключено.</b><br>{style.meme('sleep')}")
         return
     if snap["error"]:
         st.error(snap["error"])
         st.caption("Програма пробує підключитися знову кожні 2 секунди.")
         return
     if snap["demo"]:
-        st.warning("Демо-режим: дані несправжні.")
+        style.html(style.pill("демо-режим: дані несправжні", "#FFC83D"))
     else:
-        st.success(f"Підключено: {snap['port']} · прошивка {snap['fc_info']}")
+        style.html(style.pill(f"підключено: {snap['port']} · {snap['fc_info']}", "#16B877"))
 
     data = snap["latest"]
     if data is None:
@@ -61,14 +62,14 @@ def live_panel(threshold):
 
     # ---------- Великий індикатор ----------
     if data["stable"]:
-        color, text = "#1e9e4a", f"СТАБІЛЬНО · {data['stable_for']:.1f} с"
+        bg = "linear-gradient(120deg, #B8FFE4, #2EE6A6)"
+        text, sub = f"СТАБІЛЬНО · {data['stable_for']:.1f} с", style.meme("stable")
     else:
-        color, text = "#c0392b", "НЕСТАБІЛЬНО"
-    st.markdown(
-        f"<div style='background:{color};color:white;font-size:2.2rem;font-weight:700;"
-        f"text-align:center;padding:14px;border-radius:12px'>{text}</div>",
-        unsafe_allow_html=True,
-    )
+        bg = "linear-gradient(120deg, #FFD0DC, #FF7A95)"
+        text, sub = "НЕСТАБІЛЬНО", style.meme("unstable")
+    style.html(f'<div class="rb-status" style="background:{bg}"><b>{text}</b>'
+               f'<small>{sub}</small></div>')
+    st.write("")
 
     # ---------- Числа ----------
     c = st.columns(3)   # перший рядок: кути
@@ -92,10 +93,12 @@ def live_panel(threshold):
     with g1:
         st.caption("Кути, °")
         angles = df.rename(columns={"roll": "крен", "pitch": "нахил"})
-        st.line_chart(angles, x="час, с", y=["крен", "нахил"], height=250)
+        st.line_chart(angles, x="час, с", y=["крен", "нахил"], height=250,
+                      color=["#7C5CFF", "#FF5FA2"])
     with g2:
         st.caption("Гіроскоп, °/с (лінії «поріг +» і «поріг −» — межі стабільності)")
         gyro = df.rename(columns={"gx": "X", "gy": "Y", "gz": "Z"})
         gyro["поріг +"] = threshold
         gyro["поріг −"] = -threshold
-        st.line_chart(gyro, x="час, с", y=["X", "Y", "Z", "поріг +", "поріг −"], height=250)
+        st.line_chart(gyro, x="час, с", y=["X", "Y", "Z", "поріг +", "поріг −"], height=250,
+                      color=["#7C5CFF", "#FF5FA2", "#2EC4B6", "#C9C3DA", "#C9C3DA"])

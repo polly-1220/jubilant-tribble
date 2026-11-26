@@ -16,17 +16,32 @@
 <head>
 <meta charset="utf-8">
 <style>
-  html, body { margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", sans-serif; background: transparent; }
-  #wrap { position: relative; width: 100%; height: 540px; border-radius: 10px; overflow: hidden; background: #eef1f5; }
+  /* Шрифти беремо з папки static/fonts застосунку — без інтернету */
+  @font-face { font-family: Manrope; src: url('/app/static/fonts/manrope-latin.woff2') format('woff2'); font-weight: 200 800; unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: Manrope; src: url('/app/static/fonts/manrope-cyrillic.woff2') format('woff2'); font-weight: 200 800; unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: Unbounded; src: url('/app/static/fonts/unbounded-latin.woff2') format('woff2'); font-weight: 200 900; unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: Unbounded; src: url('/app/static/fonts/unbounded-cyrillic.woff2') format('woff2'); font-weight: 200 900; unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  :root { --ink: #2A2342; }
+  html, body { margin: 0; padding: 0; font-family: Manrope, -apple-system, sans-serif; background: transparent; color: var(--ink); }
+  #wrap { position: relative; width: calc(100% - 8px); height: 536px; border-radius: 24px; overflow: hidden;
+          border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
   canvas { display: block; }
-  #toolbar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
-  button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid #c9ced6; background: #fff; cursor: pointer; }
-  button:hover { background: #f3f5f8; }
-  #legend { position: absolute; left: 10px; bottom: 10px; background: rgba(255,255,255,.92); padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.6; }
-  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
-  #mode { position: absolute; left: 10px; top: 52px; background: rgba(255,255,255,.92); padding: 6px 10px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 40px); }
-  #tip { position: absolute; pointer-events: none; background: rgba(20,20,20,.85); color: #fff; font-size: 12px; padding: 6px 8px; border-radius: 6px; display: none; white-space: nowrap; }
-  #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 20px; color: #7a1f1f; background: #fdf0ef; }
+  #toolbar { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+  button { font: inherit; font-weight: 700; font-size: 13px; padding: 7px 14px; border-radius: 999px;
+           border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer;
+           box-shadow: 2px 2px 0 var(--ink); transition: transform .08s, box-shadow .08s; }
+  button:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  button:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
+  button.primary { background: #7C5CFF; color: #fff; }
+  #legend { position: absolute; left: 12px; bottom: 12px; background: #fff; padding: 8px 12px; border-radius: 14px;
+            border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); font-size: 12px; line-height: 1.7; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: -1px; margin-right: 6px; border: 1.5px solid var(--ink); }
+  #mode { position: absolute; left: 12px; top: 58px; background: #FFD447; padding: 6px 12px; border-radius: 999px; font-size: 13px;
+          border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); max-width: calc(100% - 50px); transform: rotate(-1deg); }
+  #tip { position: absolute; pointer-events: none; background: #fff; color: var(--ink); font-size: 12px; padding: 7px 10px; border-radius: 12px;
+         border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); display: none; white-space: nowrap; }
+  #tip b { font-family: Unbounded, sans-serif; }
+  #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 20px; color: #7a1f1f; background: #FFE4EA; }
 </style>
 <script type="importmap">
   { "imports": { "three": "./three/three.module.js", "three/addons/": "./three/addons/" } }
@@ -36,13 +51,13 @@
 <div id="wrap">
   <div id="mode"></div>
   <div id="toolbar">
-    <button id="btnReset" title="Повернути камеру">🎯 Вигляд</button>
-    <button id="btnShot" title="Зберегти картинку для PDF-звіту">📸 Знімок для звіту</button>
+    <button id="btnReset" title="Повернути камеру">Вигляд</button>
+    <button id="btnShot" class="primary" title="Зберегти картинку для PDF-звіту">Знімок для звіту</button>
   </div>
   <div id="legend">
-    <div><span class="sw" style="background:#2e9e4f"></span>0 підтверджених тріщин</div>
-    <div><span class="sw" style="background:#f2c12e"></span>1–2</div>
-    <div><span class="sw" style="background:#d63b3b"></span>3 і більше</div>
+    <div><span class="sw" style="background:#34D399"></span>0 підтверджених тріщин</div>
+    <div><span class="sw" style="background:#FFC83D"></span>1–2</div>
+    <div><span class="sw" style="background:#FF4D6D"></span>3 і більше</div>
   </div>
   <div id="tip"></div>
   <div id="err"></div>
@@ -53,7 +68,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const HEIGHT = 540;
+const HEIGHT = 536;
 const SECTORS = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3'];
 
 // ---------- Зв'язок зі Streamlit ----------
@@ -72,7 +87,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 wrap.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#eef1f5');
+scene.background = new THREE.Color('#F6F0FF');
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -81,7 +96,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
 sun.position.set(5, 8, 6);
 scene.add(sun);
-const grid = new THREE.GridHelper(20, 40, 0xc3c8d0, 0xd8dce2);
+const grid = new THREE.GridHelper(20, 40, 0xc9bdf0, 0xe4dcfb);
 scene.add(grid);
 
 const modelRoot = new THREE.Group();   // сама модель (або тестовий будинок)
@@ -106,11 +121,11 @@ window.addEventListener('resize', resize);
 function buildTestHouse() {
   const W = 3, H = 3, D = 1.6;
   const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D),
-    new THREE.MeshStandardMaterial({ color: 0xd9d4cc, roughness: 0.9 }));
+    new THREE.MeshStandardMaterial({ color: 0xF4EEE6, roughness: 0.9 }));
   body.position.y = H / 2;
   modelRoot.add(body);
   const roof = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1.1, 4),
-    new THREE.MeshStandardMaterial({ color: 0x8c6b5a, roughness: 0.8 }));
+    new THREE.MeshStandardMaterial({ color: 0x9B7CFF, roughness: 0.8 }));
   roof.rotation.y = Math.PI / 4;
   roof.position.y = H + 0.55;
   roof.scale.set(1, 1, 0.75);
@@ -120,7 +135,7 @@ function buildTestHouse() {
   SECTORS.forEach((name, i) => {
     const row = Math.floor(i / 3), col = i % 3;
     const tile = new THREE.Mesh(new THREE.PlaneGeometry(tw - gap, th - gap),
-      new THREE.MeshStandardMaterial({ color: 0x2e9e4f, roughness: 0.7 }));
+      new THREE.MeshStandardMaterial({ color: 0x34D399, roughness: 0.7 }));
     tile.position.set(-W / 2 + tw * (col + 0.5), H - th * (row + 0.5), D / 2 + 0.005);
     tile.name = name;
     tile.userData.sector = name;
@@ -174,11 +189,12 @@ function makeLabel(text, color) {
   const cnv = document.createElement('canvas');
   cnv.width = 256; cnv.height = 96;
   const ctx = cnv.getContext('2d');
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.roundRect(4, 4, 248, 88, 18); ctx.fill();
-  ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.stroke();
-  ctx.fillStyle = '#111'; ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, 128, 50);
+  ctx.strokeStyle = '#2A2342'; ctx.lineWidth = 6; ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(34, 48, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#111'; ctx.font = '800 40px Unbounded, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 144, 50);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: new THREE.CanvasTexture(cnv), depthTest: false, transparent: true }));
   const s = modelSize * 0.09;
@@ -189,7 +205,7 @@ function makeLabel(text, color) {
 
 // ---------- Кольори і мітки секторів ----------
 function statsFor(name) {
-  return (args.stats || {})[name] || { confirmed: 0, pending: 0, rejected: 0, images: 0, color: '#2e9e4f' };
+  return (args.stats || {})[name] || { confirmed: 0, pending: 0, rejected: 0, images: 0, color: '#34D399' };
 }
 
 function updateSectors() {
@@ -246,9 +262,9 @@ function updateSectors() {
 function updateModeText() {
   const el = document.getElementById('mode');
   if (args.mode === 'mark') {
-    el.innerHTML = `✏️ <b>Розмітка:</b> клікни на моделі, де сектор <b>${args.mark_sector}</b>`;
+    el.innerHTML = `<b>Розмітка:</b> клікни на моделі, де сектор <b>${args.mark_sector}</b>`;
   } else {
-    el.innerHTML = '👆 Клікни на сектор, щоб побачити знахідки. Мишка: обертати, коліщатко: масштаб.';
+    el.innerHTML = 'Клікни на сектор — побачиш знахідки. Мишка крутить, коліщатко зумить.';
   }
 }
 
@@ -271,6 +287,8 @@ async function onRender(newArgs) {
         '. Перевір файл (формат GLB, без Draco-стиснення).';
     }
   }
+  // Чекаємо шрифт для підписів (інакше перший раз намалюється звичайним шрифтом)
+  try { await document.fonts.load('800 40px Unbounded'); } catch (e) { /* не страшно */ }
   updateSectors();
   updateModeText();
 }
@@ -322,7 +340,8 @@ renderer.domElement.addEventListener('pointermove', (ev) => {
   const name = sectorAt(ev);
   if (!name) { tip.style.display = 'none'; return; }
   const st = statsFor(name);
-  tip.innerHTML = `<b>${name}</b> · знімків ${st.images}<br>🔴 підтверджено ${st.confirmed} · 🟡 не перевірено ${st.pending} · ⚪ відхилено ${st.rejected}`;
+  const d = (c) => `<span class="sw" style="background:${c}"></span>`;
+  tip.innerHTML = `<b>${name}</b> · знімків ${st.images}<br>${d('#FF4D6D')}підтверджено ${st.confirmed} &nbsp; ${d('#FFC83D')}не перевірено ${st.pending} &nbsp; ${d('#B9B4C7')}відхилено ${st.rejected}`;
   const rect = wrap.getBoundingClientRect();
   tip.style.left = Math.min(ev.clientX - rect.left + 14, rect.width - 260) + 'px';
   tip.style.top = (ev.clientY - rect.top + 14) + 'px';

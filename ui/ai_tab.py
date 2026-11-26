@@ -4,8 +4,14 @@
 import streamlit as st
 
 from core import analysis, captures, config, detector
+from ui import style
 
 CONF_NOTE = "впевненість моделі, не оцінка небезпеки"
+
+
+def legend():
+    return "".join(style.status_pill(s) for s in
+                   (analysis.PENDING, analysis.CONFIRMED, analysis.REJECTED))
 
 
 def render():
@@ -14,14 +20,16 @@ def render():
     # ---------- Яка модель працює ----------
     det = detector.get_detector()
     if detector.is_stub():
-        st.warning(f"⚠️ Файл AI-моделі `models/{config.CRACK_MODEL_PATH.name}` не знайдено. "
+        style.show_sticker(style.meme("stub"), "#FFC83D", -2)
+        st.warning(f"Файл AI-моделі `models/{config.CRACK_MODEL_PATH.name}` не знайдено. "
                    f"Працює **{det.name}**. Числа «впевненості» заглушки умовні.")
     else:
-        st.success(f"🤖 Модель: {det.name}")
+        st.success(f"Модель: {det.name}")
 
     items = captures.list_captures()
     if not items:
-        st.info("Ще немає знімків. Зроби їх на вкладці «📷 Зйомка».")
+        style.empty("Ще немає знімків. Зроби їх у розділі «Зйомка».<br>"
+                    + style.meme("empty_gallery"))
         return
 
     # ---------- Запуск аналізу ----------
@@ -31,8 +39,9 @@ def render():
     skip_bad = c2.toggle("Пропускати кадри «перезняти»", value=True)
 
     new = [m for m in items if "analysis" not in m and (m["quality"]["ok"] or not skip_bad)]
-    if st.button(f"🤖 Аналізувати нові знімки ({len(new)})", type="primary", disabled=not new):
-        bar = st.progress(0.0, text="Аналіз…")
+    if st.button(f"Аналізувати нові знімки ({len(new)})", icon=":material/auto_awesome:",
+                 type="primary", disabled=not new):
+        bar = st.progress(0.0, text="AI думає…")
         for i, m in enumerate(new, start=1):
             analysis.analyze(m["id"], conf_thr=conf)
             bar.progress(i / len(new), text=f"Аналіз {i} з {len(new)}")
@@ -45,10 +54,10 @@ def render():
         for k, v in analysis.counts(m).items():
             total[k] += v
     s = st.columns(4)
-    s[0].metric("Проаналізовано знімків", f"{len(analyzed)} з {len(items)}")
-    s[1].metric("🟡 Очікують перевірки", total[analysis.PENDING])
-    s[2].metric("🔴 Підтверджено", total[analysis.CONFIRMED])
-    s[3].metric("⚪ Відхилено", total[analysis.REJECTED])
+    s[0].metric("Проаналізовано", f"{len(analyzed)} / {len(items)}")
+    s[1].metric("Чекають перевірки", total[analysis.PENDING])
+    s[2].metric("Підтверджено", total[analysis.CONFIRMED])
+    s[3].metric("Відхилено", total[analysis.REJECTED])
 
     if not analyzed:
         return
@@ -67,8 +76,7 @@ def render():
     cap_id = st.selectbox("Знімок для перевірки", ids, key="review_cap",
                           format_func=lambda i: label(by_id[i]))
     c = analysis.counts(by_id[cap_id])
-    st.caption(f"На цьому знімку: 🟡 чекають {c[analysis.PENDING]} · "
-               f"🔴 підтверджено {c[analysis.CONFIRMED]} · ⚪ відхилено {c[analysis.REJECTED]}")
+    style.html("На цьому знімку: " + "".join(style.status_pill(k, v) for k, v in c.items()))
     review_capture(cap_id, conf)
 
 
@@ -77,21 +85,21 @@ def review_capture(cap_id, conf):
     a = meta["analysis"]
     left, right = st.columns([3, 2])
     with left:
-        st.image(str(config.ANNOTATED_DIR / f"{cap_id}.jpg"), width="stretch",
-                 caption="🟡 очікує перевірки · 🔴 підтверджено · ⚪ відхилено")
+        st.image(str(config.ANNOTATED_DIR / f"{cap_id}.jpg"), width="stretch")
+        style.html(legend())
     with right:
         st.write(f"**Сектор:** {meta['sector']['name'] or 'не визначено'}")
         if not meta["quality"]["ok"]:
             st.warning("Кадр позначено «перезняти»: " + ", ".join(meta["quality"]["reasons"]))
         st.write(f"**Модель:** {a['model']}")
         st.write(f"**Час аналізу:** {a['ms']:.0f} мс · поріг впевненості {a['conf_threshold']}")
-        if st.button("🔄 Проаналізувати цей знімок знову",
+        if st.button("Проаналізувати знову", icon=":material/refresh:",
                      help="Увага: попередні рішення щодо знахідок цього знімка буде скинуто."):
             analysis.analyze(cap_id, conf_thr=conf)
             st.rerun()
 
     if not a["findings"]:
-        st.success("На цьому знімку тріщин не знайдено.")
+        style.empty(f"<b>На цьому знімку тріщин не знайдено.</b><br>{style.meme('no_findings')}")
         return
 
     st.caption(f"Число біля кожної знахідки — {CONF_NOTE}.")
@@ -100,27 +108,26 @@ def review_capture(cap_id, conf):
 
 
 def finding_card(cap_id, f):
-    icon = {analysis.PENDING: "🟡", analysis.CONFIRMED: "🔴", analysis.REJECTED: "⚪"}[f["status"]]
     with st.container(border=True):
         c1, c2 = st.columns([1, 2])
         with c1:
             st.image(analysis.crop_finding(cap_id, f), width="stretch")
         with c2:
-            st.markdown(f"**{icon} Знахідка №{f['n']}** — {f['status']}")
+            style.html(f"<b>Знахідка №{f['n']}</b> &nbsp;" + style.status_pill(f["status"]))
             st.write(f"Впевненість: **{f['confidence']:.2f}**")
             st.caption(CONF_NOTE)
             st.caption(f"Довжина ≈ {f['length_px']:.0f} px · площа маски {f['area_px']} px")
 
             b1, b2, b3 = st.columns(3)
-            if b1.button("✅ Підтвердити", key=f"ok_{cap_id}_{f['n']}",
+            if b1.button("Підтвердити", icon=":material/check:", key=f"ok_{cap_id}_{f['n']}",
                          disabled=f["status"] == analysis.CONFIRMED):
                 analysis.set_review(cap_id, f["n"], status=analysis.CONFIRMED)
                 st.rerun()
-            if b2.button("❌ Відхилити", key=f"no_{cap_id}_{f['n']}",
+            if b2.button("Відхилити", icon=":material/close:", key=f"no_{cap_id}_{f['n']}",
                          disabled=f["status"] == analysis.REJECTED):
                 analysis.set_review(cap_id, f["n"], status=analysis.REJECTED)
                 st.rerun()
-            if b3.button("↩️ Скинути", key=f"reset_{cap_id}_{f['n']}",
+            if b3.button("Скинути", icon=":material/undo:", key=f"reset_{cap_id}_{f['n']}",
                          disabled=f["status"] == analysis.PENDING):
                 analysis.set_review(cap_id, f["n"], status=analysis.PENDING)
                 st.rerun()

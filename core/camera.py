@@ -61,8 +61,8 @@ class CameraReader:
         with self.lock:
             self.last_shot_time = time.monotonic()
             self.shots_count += 1
-            q = "✅ якість добра" if meta["quality"]["ok"] else \
-                "⚠️ перезняти: " + ", ".join(meta["quality"]["reasons"])
+            q = "якість добра" if meta["quality"]["ok"] else \
+                "перезняти: " + ", ".join(meta["quality"]["reasons"])
             sec = meta["sector"]["name"] or "сектор не визначено"
             self.last_message = f"{time.strftime('%H:%M:%S')} · {source} · {sec} · {q}"
         return meta

@@ -19,8 +19,9 @@ from core import captures, config, detector, timing_log
 
 PENDING, CONFIRMED, REJECTED = "очікує", "підтверджено", "відхилено"
 
-# Кольори для розмітки (BGR): чекає перевірки — жовтий, підтверджено — червоний, відхилено — сірий
-STATUS_COLORS = {PENDING: (0, 200, 255), CONFIRMED: (40, 40, 230), REJECTED: (150, 150, 150)}
+# Кольори для розмітки (порядок BGR, як в OpenCV) — такі самі, як в інтерфейсі:
+# чекає перевірки — жовтий #FFC83D, підтверджено — рожево-червоний #FF4D6D, відхилено — сірий
+STATUS_COLORS = {PENDING: (61, 200, 255), CONFIRMED: (109, 77, 255), REJECTED: (199, 180, 185)}
 
 
 def analyze(cap_id, conf_thr=0.25):

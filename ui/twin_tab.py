@@ -17,12 +17,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from core import analysis, captures, config, db, stats
+from ui import style
 
 # Наш власний компонент: HTML + three.js з папки ui/twin_component (без інтернету)
 _twin = components.declare_component(
     "rebuild_twin", path=str(Path(__file__).parent / "twin_component"))
 
-STATUS_ICON = {stats.PENDING: "🟡", stats.CONFIRMED: "🔴", stats.REJECTED: "⚪"}
 
 
 # ---------- sectors.json ----------
@@ -60,7 +60,8 @@ def model_url():
 
 # ---------- Розділ ----------
 def render():
-    st.subheader("🧊 3D-двійник макета")
+    st.subheader("3D-двійник макета")
+    style.meme_line("twin")
     survey_id = db.get_active_survey_id()
     url = model_url()
     is_test = url is None
@@ -79,9 +80,10 @@ def render():
         if missing:
             st.warning(f"Не розмічено сектори: {', '.join(missing)}. "
                        "Увімкни «Розмітка секторів» і клікни на моделі.")
-        mode_label = st.radio("Режим", ["👁 Перегляд", "✏️ Розмітка секторів"], horizontal=True,
-                              key="twin_mode")
-        if mode_label.startswith("✏️"):
+        mode_label = st.segmented_control(
+            "Режим", ["Перегляд", "Розмітка секторів"], key="twin_mode", default="Перегляд",
+            required=True)
+        if mode_label == "Розмітка секторів":
             mode = "mark"
             c1, c2, c3 = st.columns([1, 2, 1])
             default = missing[0] if missing else config.SECTOR_NAMES[0]
@@ -99,7 +101,7 @@ def render():
                 sectors[mark_sector]["radius"] = radius
                 save_sectors(model_name, sectors)
             st.session_state["twin_radius"] = radius
-            if c3.button("🗑 Прибрати", disabled=mark_sector not in sectors):
+            if c3.button("Прибрати", icon=":material/delete:", disabled=mark_sector not in sectors):
                 sectors.pop(mark_sector, None)
                 save_sectors(model_name, sectors)
                 st.rerun()
@@ -137,7 +139,7 @@ def render():
         elif event["type"] == "snapshot":
             png = base64.b64decode(event["png"].split(",", 1)[1])
             config.SNAPSHOT_3D.write_bytes(png)
-            st.success("📸 Знімок 3D-моделі збережено — він буде у PDF-звіті.")
+            st.success("Знімок 3D-моделі збережено — він буде у PDF-звіті.")
 
     if config.SNAPSHOT_3D.exists():
         st.caption("У звіті буде останній збережений знімок 3D-моделі "
@@ -153,9 +155,11 @@ def render():
 
 def sector_findings(name, s):
     st.markdown(f"### Сектор {name}")
-    st.write(f"Знімків: **{s['images']}** · 🔴 підтверджено **{s['confirmed']}** · "
-             f"🟡 не перевірено **{s['pending']}** · ⚪ відхилено **{s['rejected']}** · "
-             f"рівень: **{stats.sector_level(s['confirmed'])}**")
+    style.html(style.pill(f"знімків: {s['images']}", "#7CD3FF")
+               + style.status_pill(stats.CONFIRMED, s["confirmed"])
+               + style.status_pill(stats.PENDING, s["pending"])
+               + style.status_pill(stats.REJECTED, s["rejected"])
+               + style.pill(f"рівень: {stats.sector_level(s['confirmed'])}", s["color"]))
     if not s["findings"]:
         st.caption("Знахідок у цьому секторі немає.")
         return
@@ -165,9 +169,9 @@ def sector_findings(name, s):
     for i, f in enumerate(items):
         with cols[i % 3], st.container(border=True):
             st.image(analysis.crop_finding(f["image_id"], f), width="stretch")
-            st.write(f"{STATUS_ICON[f['status']]} №{f['n']} — {f['status']}")
+            style.html(f"<b>№{f['n']}</b> &nbsp;" + style.status_pill(f["status"]))
             st.caption(f"Знімок {f['image_time'].replace('T', ' ')} · впевненість "
                        f"{f['confidence']:.2f} (впевненість моделі, не оцінка небезпеки)")
             if f["comment"]:
-                st.caption(f"💬 {f['comment']}")
-    st.caption("Змінити рішення можна в розділі «🤖 AI-аналіз».")
+                st.caption(f"Коментар: {f['comment']}")
+    st.caption("Змінити рішення можна в розділі «AI-аналіз».")

@@ -12,7 +12,7 @@ from core import captures, config
 PENDING, CONFIRMED, REJECTED = "очікує", "підтверджено", "відхилено"
 
 # Кольори у форматі #RRGGBB (для PDF і 3D)
-GREEN, YELLOW, RED, GREY = "#2e9e4f", "#f2c12e", "#d63b3b", "#9aa0a6"
+GREEN, YELLOW, RED, GREY = "#34D399", "#FFC83D", "#FF4D6D", "#B9B4C7"
 
 
 def sector_color(confirmed):
