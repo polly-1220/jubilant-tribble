@@ -20,6 +20,7 @@ MAKET_MODEL_PATH = MODELS_DIR / "maket.glb"       # 3D-модель макета
 SECTORS_JSON = ROOT / "sectors.json"              # розмітка секторів на 3D
 
 REPORTS_DIR = ROOT / "reports"
+SNAPSHOT_3D = DATA_DIR / "3d_snapshot.png"  # знімок 3D-моделі для звіту (етап 6)
 LOGS_DIR = ROOT / "logs"
 STATIC_DIR = ROOT / "static"
 

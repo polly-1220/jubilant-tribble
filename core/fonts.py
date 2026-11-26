@@ -20,3 +20,6 @@ def register_reportlab_fonts():
     if "DejaVu" not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(TTFont("DejaVu", str(dejavu_path())))
         pdfmetrics.registerFont(TTFont("DejaVu-Bold", str(dejavu_path(bold=True))))
+        # «Сімейство»: щоб <b>текст</b> у звіті ставав жирним
+        pdfmetrics.registerFontFamily("DejaVu", normal="DejaVu", bold="DejaVu-Bold",
+                                      italic="DejaVu", boldItalic="DejaVu-Bold")

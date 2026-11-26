@@ -12,6 +12,8 @@ data/annotated/*
 data/masks/*
 data/import/*
 data/*.db
+data/*.db-*
+data/3d_snapshot.png
 reports/*
 logs/*
 # ...але порожні папки зберігаємо (файли .gitkeep)

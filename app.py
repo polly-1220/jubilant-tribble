@@ -4,20 +4,41 @@ ReBuildDrone — головний файл застосунку.
 """
 import streamlit as st
 
-from core import config
-from ui import ai_tab, camera_tab, drone_tab
+from core import config, db
+from ui import ai_tab, camera_tab, drone_tab, report_tab
 
 # Налаштування сторінки (має бути першою командою Streamlit)
 st.set_page_config(page_title="ReBuildDrone", page_icon="🛸", layout="wide")
 
-# Створюємо папки для даних, якщо їх ще немає
+# Створюємо папки для даних і базу даних, якщо їх ще немає
 config.ensure_folders()
+db.init()
 
 st.title("🛸 ReBuildDrone")
 st.caption("Пошук тріщин на макеті будівлі за допомогою дрона та AI. Працює офлайн.")
 
-# ---------- Бічна панель: стан системи ----------
+# ---------- Бічна панель: обстеження і стан системи ----------
 with st.sidebar:
+    st.header("📋 Обстеження")
+    surveys = db.list_surveys()
+    by_id = {s["id"]: s for s in surveys}
+    active = db.get_active_survey_id()
+    chosen = st.selectbox(
+        "Нові знімки зберігаються в:", list(by_id), index=list(by_id).index(active),
+        format_func=lambda i: f"{by_id[i]['name']} ({by_id[i]['created_at'][:10]})",
+    )
+    if chosen != active:
+        db.set_active_survey_id(chosen)
+        st.rerun()
+    st.caption(f"Знімків у цьому обстеженні: {by_id[chosen]['images']}")
+    with st.expander("➕ Нове обстеження"):
+        new_name = st.text_input("Назва", placeholder="напр.: Макет школи, сторона А")
+        new_notes = st.text_area("Примітки (необов'язково)", height=70)
+        if st.button("Створити", disabled=not new_name.strip()):
+            db.set_active_survey_id(db.create_survey(new_name, new_notes))
+            st.rerun()
+
+    st.divider()
     st.header("Стан системи")
 
     # Перевіряємо, чи встановлені потрібні бібліотеки
@@ -59,8 +80,7 @@ elif section == "📷 Зйомка":
 elif section == "🤖 AI-аналіз":
     ai_tab.render()
 elif section == "📄 Звіт":
-    st.subheader("PDF-звіт")
-    st.info("Етап 5: збереження в базу і формування звіту.")
+    report_tab.render()
 else:
     st.subheader("3D-двійник макета")
     st.info("Етап 6: 3D-модель із кольоровими секторами.")
