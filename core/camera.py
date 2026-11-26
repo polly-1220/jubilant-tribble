@@ -57,7 +57,7 @@ class CameraReader:
         if frame is None:
             return None
         reader = get_reader()
-        meta = captures.save_capture(frame, source, reader.latest_sample(), demo=reader.demo)
+        meta = captures.save_capture(frame, source, reader.latest_sample())
         with self.lock:
             self.last_shot_time = time.monotonic()
             self.shots_count += 1

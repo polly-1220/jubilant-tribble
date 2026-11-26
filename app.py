@@ -62,7 +62,7 @@ with st.sidebar:
                            else "AI-модель: заглушка",
                            "#16B877" if config.CRACK_MODEL_PATH.exists() else "#FFC83D"))
     rows.append(style.pill("3D-модель: є" if config.MAKET_MODEL_PATH.exists()
-                           else "3D: тестовий будинок",
+                           else "3D: тестова будівля",
                            "#16B877" if config.MAKET_MODEL_PATH.exists() else "#FFC83D"))
     style.html("<div>" + "".join(rows) + "</div>")
     style.html('<div class="rb-footer">зроблено з кавою, паяльником і дедлайнами</div>')

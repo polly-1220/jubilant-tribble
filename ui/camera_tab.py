@@ -155,9 +155,8 @@ def capture_card(meta):
                  else style.pill("перезняти: " + ", ".join(q["reasons"]), BAD)]
         d = meta["drone"]
         if d:
-            demo = " · демо" if d.get("demo") else ""
             pills.append(style.pill(f"крен {d['roll']:+.1f}° · нахил {d['pitch']:+.1f}° · "
-                                    f"рискання {d['yaw']:.0f}°{demo}", "#7CD3FF"))
+                                    f"рискання {d['yaw']:.0f}°", "#7CD3FF"))
         else:
             pills.append(style.pill("кути дрона: немає", "#C9C3DA"))
         style.html("".join(pills))

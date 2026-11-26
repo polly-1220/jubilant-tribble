@@ -28,18 +28,17 @@ def _new_id():
     return datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
 
 
-def _drone_info(drone_sample, demo):
+def _drone_info(drone_sample):
     """Кути дрона в момент зйомки (або None, якщо дрона немає)."""
     if not drone_sample:
         return None
     keys = ["roll", "pitch", "yaw", "gx", "gy", "gz", "stable"]
     info = {k: (round(drone_sample[k], 2) if isinstance(drone_sample[k], float)
                 else drone_sample[k]) for k in keys}
-    info["demo"] = bool(demo)
     return info
 
 
-def save_capture(frame_bgr, source, drone_sample=None, demo=False, original_name=None):
+def save_capture(frame_bgr, source, drone_sample=None, original_name=None):
     """
     Зберігає кадр і його опис у поточне обстеження.
     source: «автозйомка», «кнопка» або «імпорт». Повертає словник-опис знімка.
@@ -57,7 +56,7 @@ def save_capture(frame_bgr, source, drone_sample=None, demo=False, original_name
         "original_name": original_name,
         "width": int(frame_bgr.shape[1]),
         "height": int(frame_bgr.shape[0]),
-        "drone": _drone_info(drone_sample, demo),
+        "drone": _drone_info(drone_sample),
         "quality": quality.check(frame_bgr),
         "sector": sector.find_sector(frame_bgr),
     }
@@ -80,7 +79,7 @@ def _write_meta(meta, con=None):
         "roll": d.get("roll"), "pitch": d.get("pitch"), "yaw": d.get("yaw"),
         "gx": d.get("gx"), "gy": d.get("gy"), "gz": d.get("gz"),
         "drone_stable": int(d["stable"]) if d else None,
-        "drone_demo": int(d.get("demo", False)) if d else None,
+        "drone_demo": 0 if d else None,
         "sharpness": q["sharpness"], "brightness": q["brightness"],
         "quality_ok": int(q["ok"]), "quality_reasons": ",".join(q["reasons"]),
         "sector": s.get("name"), "sector_method": s.get("method"),
@@ -123,7 +122,7 @@ def _row_to_meta(r, findings):
         "drone": {
             "roll": r["roll"], "pitch": r["pitch"], "yaw": r["yaw"],
             "gx": r["gx"], "gy": r["gy"], "gz": r["gz"],
-            "stable": bool(r["drone_stable"]), "demo": bool(r["drone_demo"]),
+            "stable": bool(r["drone_stable"]),
         } if has_drone else None,
         "quality": {
             "sharpness": r["sharpness"], "brightness": r["brightness"],

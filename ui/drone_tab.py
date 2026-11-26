@@ -17,11 +17,9 @@ def render():
                "(або закрий його вкладку), інакше порт буде зайнятий.")
 
     # ---------- Кнопки керування ----------
-    col1, col2, col3 = st.columns([1, 1, 2], vertical_alignment="center")
-    demo = col3.toggle("Демо-режим (без дрона)", value=False,
-                       help="Несправжні дані, щоб перевірити інтерфейс без дрона.")
+    col1, col2, _ = st.columns([1, 1, 2], vertical_alignment="center")
     if col1.button("Підключити", icon=":material/link:", type="primary", width="stretch"):
-        reader.start(demo=demo)
+        reader.start()
     if col2.button("Від'єднати", icon=":material/link_off:", width="stretch"):
         reader.stop()
 
@@ -50,10 +48,7 @@ def live_panel(threshold):
         st.error(snap["error"])
         st.caption("Програма пробує підключитися знову кожні 2 секунди.")
         return
-    if snap["demo"]:
-        style.html(style.pill("демо-режим: дані несправжні", "#FFC83D"))
-    else:
-        style.html(style.pill(f"підключено: {snap['port']} · {snap['fc_info']}", "#16B877"))
+    style.html(style.pill(f"підключено: {snap['port']} · {snap['fc_info']}", "#16B877"))
 
     data = snap["latest"]
     if data is None:

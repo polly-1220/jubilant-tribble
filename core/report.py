@@ -93,8 +93,7 @@ def _drone_text(meta):
     d = meta["drone"]
     if not d:
         return "кути дрона: немає"
-    demo = " (демо-режим)" if d.get("demo") else ""
-    return f"крен {d['roll']:+.1f}°, нахил {d['pitch']:+.1f}°, рискання {d['yaw']:.0f}°{demo}"
+    return f"крен {d['roll']:+.1f}°, нахил {d['pitch']:+.1f}°, рискання {d['yaw']:.0f}°"
 
 
 # ---------- Головна функція ----------
